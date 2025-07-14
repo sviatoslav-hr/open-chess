@@ -1,6 +1,7 @@
 # Open Chess
 
 An application for learning and practicing chess opening.
+[Start learning](https://sviatoslav-hr.github.io/open-chess/)
 
 ## Developing
 
