@@ -1,3 +1,7 @@
-<main class="flex grow items-center justify-center">
-	<h1 class="text-4xl">Welcome to Open Chess</h1>
+<script lang="ts">
+	import Board from './components/Board.svelte';
+</script>
+
+<main class="flex grow flex-col items-center justify-center">
+	<Board />
 </main>
