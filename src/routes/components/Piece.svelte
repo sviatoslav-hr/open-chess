@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { cn } from '../../utils';
-	import type { PieceColor, PieceId } from '../types';
+	import type { PieceId } from '../../types/chess';
 
 	interface Props {
 		className?: string;
 		id: PieceId;
-		color: PieceColor;
 	}
 
-	let { className: classNameInput, id, color }: Props = $props();
+	let { className: classNameInput, id }: Props = $props();
 	let pieceSrc = $derived.by(() => {
-		const colorCode = color === 'white' ? 'W' : 'B';
-		return `${base}/Chess_${colorCode}${id}.svg`;
+		const color = id === id.toLowerCase() ? 'black' : 'white';
+		const pieceType = id.toLowerCase();
+		return `${base}/piece_${pieceType}_${color}.svg`;
 	});
 </script>
 

@@ -1,4 +1,4 @@
-import type { PieceId, PieceColor } from '../../routes/types';
+import type { PieceId } from '../../types/chess';
 
 const VALID_PIECES = ['p', 'n', 'b', 'r', 'q', 'k'];
 
@@ -31,17 +31,7 @@ export function validateFen(fen: string): boolean {
 }
 
 export function fenToPieceId(char: string): PieceId {
-	const mapping: Record<string, PieceId> = {
-		p: 'p',
-		n: 'N',
-		b: 'B',
-		r: 'R',
-		q: 'Q',
-		k: 'K'
-	};
-	return mapping[char.toLowerCase()];
-}
-
-export function getColorFromFenChar(char: string): PieceColor {
-	return char === char.toUpperCase() ? 'white' : 'black';
+	// FEN uses uppercase for white pieces and lowercase for black pieces
+	// Return the character directly since it matches our PieceId type
+	return char as PieceId;
 }

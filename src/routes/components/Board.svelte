@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { cn } from '../../utils';
-	import { fenToPieceId, getColorFromFenChar } from '$lib/chess/fen';
+	import { fenToPieceId } from '$lib/chess/fen';
 	import Piece from './Piece.svelte';
-	import type { PieceId, PieceColor } from '../types';
+	import type { PieceId } from '../../types/chess';
 
 	interface Props {
 		className?: string;
@@ -16,7 +16,7 @@
 	const cols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
 
 	let positionMap = $derived.by(() => {
-		const map = new Map<string, { type: PieceId; color: PieceColor }>();
+		const map = new Map<string, PieceId>();
 		const [piecePlacement] = fen.split(' ');
 		const fenRows = piecePlacement.split('/');
 
@@ -27,10 +27,7 @@
 					colIndex += Number(char);
 				} else {
 					const square = `${cols[colIndex]}${rowIndex + 1}`;
-					map.set(square, {
-						type: fenToPieceId(char),
-						color: getColorFromFenChar(char)
-					});
+					map.set(square, fenToPieceId(char));
 					colIndex += 1;
 				}
 			}
@@ -71,7 +68,7 @@
 						{#if positionMap.has(`${col}${row}`)}
 							{@const piece = positionMap.get(`${col}${row}`)}
 							{#if piece}
-								<Piece id={piece.type} color={piece.color} />
+								<Piece id={piece} />
 							{/if}
 						{/if}
 					</div>
