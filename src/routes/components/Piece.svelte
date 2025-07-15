@@ -12,7 +12,7 @@
 	let { className: classNameInput, id, color }: Props = $props();
 	let pieceSrc = $derived.by(() => {
 		const colorCode = color === 'white' ? 'W' : 'B';
-		return `${base}/pieces/${colorCode}${id}.svg`;
+		return `${base}/Chess_${colorCode}${id}.svg`;
 	});
 </script>
 
