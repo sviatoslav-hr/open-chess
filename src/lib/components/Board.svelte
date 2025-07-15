@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { cn } from '../../utils';
-	import { fenToPieceId } from '$lib/chess/fen';
+	import { cn } from '$lib/utils';
+	import { fenToPieceId } from '$lib/fen';
 	import Piece from './Piece.svelte';
-	import type { PieceId } from '../../types/chess';
+	import type { PieceId } from '$lib/piece';
 
 	interface Props {
 		className?: string;

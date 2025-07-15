@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { cn } from '../../utils';
+	import { cn } from '$lib/utils';
 
 	interface Props {
 		type?: 'button' | 'submit' | 'reset';

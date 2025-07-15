@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { cn } from '../../utils';
-	import type { PieceId } from '../../types/chess';
+	import type { PieceId } from '$lib/piece';
+	import { cn } from '$lib/utils';
 
 	interface Props {
 		className?: string;

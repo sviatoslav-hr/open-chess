@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Board from './components/Board.svelte';
-	import Button from './components/Button.svelte';
-	import FenInput from './components/FenInput.svelte';
+	import Board from '$lib/components/Board.svelte';
+	import Button from '$lib/components/Button.svelte';
+	import FenInput from '$lib/components/FenInput.svelte';
 
 	let boardRotated = $state(false);
 	let currentFen = $state('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR');

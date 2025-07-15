@@ -1,4 +1,4 @@
-import type { PieceId } from '../../types/chess';
+import type { PieceId } from '$lib/piece';
 
 const VALID_PIECES = ['p', 'n', 'b', 'r', 'q', 'k'];
 

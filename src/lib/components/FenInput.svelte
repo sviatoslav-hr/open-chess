@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { validateFen } from '$lib/chess/fen';
-	import { cn, debounce } from '../../utils';
+	import { validateFen } from '$lib/fen';
+	import { cn, debounce } from '$lib/utils';
 
 	interface Props {
 		class?: string;
