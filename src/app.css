@@ -3,3 +3,7 @@
 :root {
 	box-sizing: border-box;
 }
+
+@theme {
+	--color-transparent: transparent;
+}
