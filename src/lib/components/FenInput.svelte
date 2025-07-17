@@ -4,11 +4,11 @@
 
 	interface Props {
 		class?: string;
+		value: string;
 		onChange?: (fen: string) => void;
 	}
 
-	let { class: className, onChange }: Props = $props();
-	let value = $state('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR');
+	let { class: className, value, onChange }: Props = $props();
 	let isValid = $state(true);
 
 	const debouncedValidate = debounce((newValue: string) => {

@@ -11,3 +11,9 @@ export type PieceId =
 	| 'B' // White Bishop
 	| 'n' // Black Knight
 	| 'N'; // White Knight
+
+const VALID_PIECES = ['p', 'n', 'b', 'r', 'q', 'k', 'P', 'N', 'B', 'R', 'Q', 'K'];
+
+export function isValidPieceId(pieceId: string): pieceId is PieceId {
+	return VALID_PIECES.includes(pieceId);
+}
