@@ -5,6 +5,7 @@ import {
 	type BoardMap,
 	type BoardPosition
 } from '$lib/board';
+import { type Move } from '$lib/moves';
 import { isNumberChar } from '$lib/number';
 import { isValidPieceId, type PieceId } from '$lib/piece';
 
@@ -54,6 +55,146 @@ export interface FenBoardInfo {
 	fullMoveNumber: number;
 }
 
+export function fenToString(fen: FenBoardInfo): string {
+	const rows: string[] = [];
+	for (let i = BOARD_ROWS.length - 1; i >= 0; i--) {
+		const row = BOARD_ROWS[i];
+		let rowStr = '';
+		let emptyCount = 0;
+
+		for (const col of BOARD_COLS) {
+			const piece = fen.map.get(`${col}${row}`);
+			if (piece) {
+				if (emptyCount > 0) {
+					rowStr += emptyCount;
+					emptyCount = 0;
+				}
+				rowStr += piece;
+			} else {
+				emptyCount++;
+			}
+		}
+		if (emptyCount > 0) {
+			rowStr += emptyCount;
+		}
+		rows.push(rowStr);
+	}
+
+	const placement = rows.join('/');
+	const turn = fen.turn;
+
+	let castling = '';
+	if (fen.canCastle.whiteKingSide) castling += 'K';
+	if (fen.canCastle.whiteQueenSide) castling += 'Q';
+	if (fen.canCastle.blackKingSide) castling += 'k';
+	if (fen.canCastle.blackQueenSide) castling += 'q';
+	if (!castling) castling = '-';
+
+	const enPassant = fen.enPassantTarget || '-';
+	const halfMove = fen.halfMoveClock;
+	const fullMove = fen.fullMoveNumber;
+
+	return `${placement} ${turn} ${castling} ${enPassant} ${halfMove} ${fullMove}`;
+}
+
+export function applyMove(fen: FenBoardInfo, move: Move): FenBoardInfo {
+	const isWhiteMove = fen.turn === 'w';
+	const newFen: FenBoardInfo = {
+		map: new Map(fen.map),
+		turn: isWhiteMove ? 'b' : 'w',
+		canCastle: { ...fen.canCastle },
+		enPassantTarget: null,
+		halfMoveClock: fen.halfMoveClock + 1,
+		fullMoveNumber: isWhiteMove ? fen.fullMoveNumber : fen.fullMoveNumber + 1
+	};
+
+	if (fen.map.get(move.from) !== move.piece) {
+		throw new Error(`Piece at ${move.from} does not match the move piece: ${move.piece}`);
+	}
+	if (move.castling) {
+		applyCastlingMove(newFen, move);
+		return newFen;
+	}
+
+	newFen.map.delete(move.from);
+	if (move.promotion != null) {
+		const promotedPiece = move.promotion;
+		newFen.map.set(move.to, promotedPiece);
+	} else {
+		newFen.map.set(move.to, move.piece);
+	}
+
+	updateCastlingRights(newFen, move);
+
+	// Reset half move clock on pawn moves or captures
+	const isPawnMove = move.piece.toLowerCase() === 'p';
+	if (isPawnMove || move.isCapture) {
+		newFen.halfMoveClock = 0;
+	}
+
+	return newFen;
+}
+
+function applyCastlingMove(newFen: FenBoardInfo, move: Move): void {
+	const isWhiteMove = move.turn === 'w';
+
+	if (move.castling === 'king-side') {
+		const rank = isWhiteMove ? '1' : '8';
+		const king: PieceId = isWhiteMove ? 'K' : 'k';
+		const rook: PieceId = isWhiteMove ? 'R' : 'r';
+
+		newFen.map.delete(`e${rank}`);
+		newFen.map.delete(`h${rank}`);
+		newFen.map.set(`g${rank}`, king);
+		newFen.map.set(`f${rank}`, rook);
+
+		if (isWhiteMove) {
+			newFen.canCastle.whiteKingSide = false;
+			newFen.canCastle.whiteQueenSide = false;
+		} else {
+			newFen.canCastle.blackKingSide = false;
+			newFen.canCastle.blackQueenSide = false;
+		}
+		return;
+	}
+
+	if (move.castling === 'queen-side') {
+		const rank = isWhiteMove ? '1' : '8';
+		const king = isWhiteMove ? 'K' : 'k';
+		const rook = isWhiteMove ? 'R' : 'r';
+
+		newFen.map.delete(`e${rank}`);
+		newFen.map.delete(`a${rank}`);
+		newFen.map.set(`c${rank}`, king);
+		newFen.map.set(`d${rank}`, rook);
+
+		if (isWhiteMove) {
+			newFen.canCastle.whiteKingSide = false;
+			newFen.canCastle.whiteQueenSide = false;
+		} else {
+			newFen.canCastle.blackKingSide = false;
+			newFen.canCastle.blackQueenSide = false;
+		}
+		return;
+	}
+}
+
+function updateCastlingRights(newFen: FenBoardInfo, move: Move): void {
+	if (move.piece === 'k') {
+		newFen.canCastle.blackKingSide = false;
+		newFen.canCastle.blackQueenSide = false;
+	} else if (move.piece === 'K') {
+		newFen.canCastle.whiteKingSide = false;
+		newFen.canCastle.whiteQueenSide = false;
+	} else if (move.piece === 'r') {
+		if (move.from === 'a8') newFen.canCastle.blackQueenSide = false;
+		if (move.from === 'h8') newFen.canCastle.blackKingSide = false;
+	} else if (move.piece === 'R') {
+		if (move.from === 'a1') newFen.canCastle.whiteQueenSide = false;
+		if (move.from === 'h1') newFen.canCastle.whiteKingSide = false;
+	}
+}
+
 export function parseFenString(fenString: string): FenBoardInfo {
 	const fenParts = fenString.split(' ');
 	if (fenParts.length < 1) {
@@ -72,6 +213,7 @@ export function parseFenString(fenString: string): FenBoardInfo {
 	if (fenRows.length !== 8) {
 		throw new Error('Invalid FEN string: must contain exactly 8 rows');
 	}
+	fenRows.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
 
 	const map: BoardMap = new Map<BoardPosition, PieceId>();
 	for (let rowIndex = fenRows.length - 1; rowIndex >= 0; rowIndex--) {

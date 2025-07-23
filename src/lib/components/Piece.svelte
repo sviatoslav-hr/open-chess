@@ -17,5 +17,5 @@
 </script>
 
 <div class={cn('flex h-20 w-20 items-center justify-center', classNameInput)}>
-	<img src={pieceSrc} alt={id} class="h-16 w-16" />
+	<img draggable="false" src={pieceSrc} alt={id} class="h-16 w-16" />
 </div>
