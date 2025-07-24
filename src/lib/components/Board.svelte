@@ -56,7 +56,8 @@
 		if (move) {
 			onMove(move);
 		} else {
-			console.error('Invalid move:', moveError);
+			// TODO: Report error to the user.
+			console.error('Invalid move:', moveError.type, moveError);
 		}
 		dragSource = null;
 		dragTarget = null;

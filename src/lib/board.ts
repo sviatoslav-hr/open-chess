@@ -12,9 +12,13 @@ export class Position {
 	file: BoardFile;
 	rank: BoardRank;
 
-	constructor(file: BoardFile, rank: BoardRank) {
+	private constructor(file: BoardFile, rank: BoardRank) {
 		this.file = file;
 		this.rank = rank;
+	}
+
+	static make(file: BoardFile, rank: BoardRank): Position {
+		return new Position(file, rank);
 	}
 
 	static fromStr(pos: PositionStr): Position {
@@ -38,6 +42,10 @@ export class Position {
 
 	rankIndex(): number {
 		return BOARD_RANKS.indexOf(this.rank);
+	}
+
+	toString(): PositionStr {
+		return `${this.file}${this.rank}`;
 	}
 }
 

@@ -16,12 +16,11 @@
 	}
 
 	function onMove(move: Move) {
-		const newFen = applyMove(boardInfo, move);
-		boardInfo = newFen;
-		const newFenStr = boardToFen(newFen);
+		boardInfo = applyMove(boardInfo, move);
+		const newFenStr = boardToFen(boardInfo);
 		currentFenStr = newFenStr;
 		// @CLEANUP:
-		console.debug('onMove: newFen', { move, newFen, newFenStr });
+		console.debug('onMove: newFen', { move, boardInfo, newFenStr });
 	}
 </script>
 

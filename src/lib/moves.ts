@@ -1,12 +1,17 @@
-import type {
-	BoardInfo,
-	BoardMap,
-	CastlingRights,
-	PlayerColor,
+import {
+	BOARD_FILES,
+	BOARD_RANKS,
+	getPieceColor,
+	isBoardFile,
+	isBoardRank,
 	Position,
-	PositionStr
+	type BoardInfo,
+	type BoardMap,
+	type BoardRank,
+	type CastlingRights,
+	type PlayerColor,
+	type PositionStr
 } from '$lib/board';
-import { BOARD_FILES, BOARD_RANKS, getPieceColor, isBoardFile, isBoardRank } from '$lib/board';
 import type { PieceId } from '$lib/piece';
 
 export interface Move {
@@ -17,7 +22,7 @@ export interface Move {
 	turn: PlayerColor;
 	isCapture: boolean;
 	castling?: 'king-side' | 'queen-side';
-	isEnPassant?: boolean;
+	isEnPassantCapture?: boolean;
 	promotion?: 'q' | 'r' | 'b' | 'n' | 'Q' | 'R' | 'B' | 'N';
 }
 
@@ -53,14 +58,14 @@ export function calculateMove(
 
 	let isValid = false;
 	let castling: 'king-side' | 'queen-side' | undefined;
-	let isEnPassant = false;
+	let isEnPassantCapture = false;
 
 	// Validate move based on piece type
 	switch (piece) {
 		case 'P':
 		case 'p':
 			isValid = isValidPawnMove(from, to, piece, board.map, board.enPassantTarget);
-			isEnPassant = isValid && to === board.enPassantTarget;
+			isEnPassantCapture = isValid && Boolean(board.enPassantTarget?.equals(to));
 			break;
 		case 'N':
 		case 'n':
@@ -103,9 +108,9 @@ export function calculateMove(
 		piece,
 		turn: pieceColor,
 		algebraic: '',
-		isCapture: !!targetPiece || isEnPassant,
+		isCapture: !!targetPiece || isEnPassantCapture,
 		castling,
-		isEnPassant,
+		isEnPassantCapture,
 		promotion
 	};
 	move.algebraic = moveToAlgebraic(move);
@@ -206,7 +211,7 @@ function isValidPawnMove(
 	}
 	// Capture (including en passant)
 	else if (Math.abs(toFileIdx - fromFileIdx) === 1 && toRankIdx - fromRankIdx === direction) {
-		return board.has(to) || to === enPassantTarget;
+		return board.has(to) || Boolean(enPassantTarget?.equals(to));
 	}
 
 	return false;
@@ -293,6 +298,13 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 	}
 
 	newBoard.map.delete(move.from);
+
+	if (move.isEnPassantCapture) {
+		const capturedPawnRank = move.from.rank;
+		const capturedPawnPos: PositionStr = `${move.to.file}${capturedPawnRank}`;
+		newBoard.map.delete(capturedPawnPos);
+	}
+
 	if (move.promotion != null) {
 		const promotedPiece = move.promotion;
 		newBoard.map.set(move.to, promotedPiece);
@@ -306,6 +318,11 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 	const isPawnMove = move.piece.toLowerCase() === 'p';
 	if (isPawnMove || move.isCapture) {
 		newBoard.halfMoveClock = 0;
+	}
+	// When a pawn moves two squares forward, it can be captured via en passant
+	if (isPawnMove && Math.abs(move.from.rankIndex() - move.to.rankIndex()) == 2) {
+		const rank: BoardRank = isWhiteMove ? '3' : '6';
+		newBoard.enPassantTarget = Position.make(move.from.file, rank);
 	}
 
 	return newBoard;
