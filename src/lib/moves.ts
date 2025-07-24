@@ -1,45 +1,54 @@
-import type { BoardMap, BoardPosition, BoardCol, BoardRow } from '$lib/board';
+import type {
+	BoardInfo,
+	BoardMap,
+	CastlingRights,
+	PlayerColor,
+	Position,
+	PositionStr
+} from '$lib/board';
+import { BOARD_FILES, BOARD_RANKS, getPieceColor, isBoardFile, isBoardRank } from '$lib/board';
 import type { PieceId } from '$lib/piece';
-import type { FenBoardInfo } from '$lib/fen';
-import { BOARD_COLS, BOARD_ROWS, isBoardPosition, isBoardCol, isBoardRow } from '$lib/board';
 
 export interface Move {
-	from: BoardPosition;
-	to: BoardPosition;
+	from: Position;
+	to: Position;
 	algebraic: string;
 	piece: PieceId;
-	turn: 'w' | 'b';
+	turn: PlayerColor;
 	isCapture: boolean;
 	castling?: 'king-side' | 'queen-side';
 	isEnPassant?: boolean;
 	promotion?: 'q' | 'r' | 'b' | 'n' | 'Q' | 'R' | 'B' | 'N';
 }
 
-export function constructMove(
-	from: BoardPosition,
-	to: BoardPosition,
-	fen: FenBoardInfo
-): Move | null {
-	if (!isValidPosition(from) || !isValidPosition(to)) {
-		console.warn('Invalid position: ', from, to);
-		return null;
-	}
+type MoveError =
+	| {
+			type: 'notYourTurn' | 'captureOwnPiece';
+	  }
+	| {
+			type: 'invalidPieceMove';
+			piece: PieceId;
+	  };
 
-	const piece = fen.map.get(from);
+// TODO: Add more specific error types for better reporting
+export function calculateMove(
+	board: BoardInfo,
+	from: Position,
+	to: Position
+): Either<Move, MoveError> {
+	const piece = board.map.get(from);
 	if (!piece) {
 		throw new Error(`No piece at position ${from}`);
 	}
 
 	const pieceColor = getPieceColor(piece);
-	if (pieceColor !== fen.turn) {
-		console.warn(`It's not ${pieceColor}'s turn: `, pieceColor, fen.turn);
-		return null;
+	if (pieceColor !== board.turn) {
+		return [null, { type: 'notYourTurn' }];
 	}
 
-	const targetPiece = fen.map.get(to);
+	const targetPiece = board.map.get(to);
 	if (targetPiece && pieceColor === getPieceColor(targetPiece)) {
-		console.warn(`Cannot capture own piece: `, targetPiece, pieceColor);
-		return null;
+		return [null, { type: 'captureOwnPiece' }];
 	}
 
 	let isValid = false;
@@ -50,8 +59,8 @@ export function constructMove(
 	switch (piece) {
 		case 'P':
 		case 'p':
-			isValid = isValidPawnMove(from, to, piece, fen.map, fen.enPassantTarget);
-			isEnPassant = isValid && to === fen.enPassantTarget;
+			isValid = isValidPawnMove(from, to, piece, board.map, board.enPassantTarget);
+			isEnPassant = isValid && to === board.enPassantTarget;
 			break;
 		case 'N':
 		case 'n':
@@ -59,19 +68,19 @@ export function constructMove(
 			break;
 		case 'B':
 		case 'b':
-			isValid = isValidBishopMove(from, to, fen.map);
+			isValid = isValidBishopMove(from, to, board.map);
 			break;
 		case 'R':
 		case 'r':
-			isValid = isValidRookMove(from, to, fen.map);
+			isValid = isValidRookMove(from, to, board.map);
 			break;
 		case 'Q':
 		case 'q':
-			isValid = isValidQueenMove(from, to, fen.map);
+			isValid = isValidQueenMove(from, to, board.map);
 			break;
 		case 'K':
 		case 'k': {
-			const result = isValidKingMove(from, to, piece, fen.map, fen.canCastle);
+			const result = isValidKingMove(from, to, piece, board.map, board.canCastle);
 			isValid = result.isValid;
 			castling = result.castling;
 			break;
@@ -79,14 +88,14 @@ export function constructMove(
 	}
 
 	if (!isValid) {
-		console.warn(`Invalid move for piece ${piece} from ${from} to ${to}`);
-		return null;
+		return [null, { type: 'invalidPieceMove', piece }];
 	}
 
 	// Check if pawn move requires promotion
-	const [, toRow] = parsePosition(to);
 	const promotion =
-		(piece === 'p' && toRow === '8' && 'q') || (piece === 'P' && toRow === '1' && 'Q') || undefined;
+		(piece === 'p' && to.rank === '8' && 'q') ||
+		(piece === 'P' && to.rank === '1' && 'Q') ||
+		undefined;
 
 	const move: Move = {
 		from,
@@ -100,7 +109,7 @@ export function constructMove(
 		promotion
 	};
 	move.algebraic = moveToAlgebraic(move);
-	return move;
+	return [move, null];
 }
 
 function moveToAlgebraic(move: Move): string {
@@ -108,212 +117,256 @@ function moveToAlgebraic(move: Move): string {
 		return move.castling === 'king-side' ? 'O-O' : 'O-O-O';
 	}
 
-	const isPawn = move.piece === 'p' || move.piece === 'P';
 	let notation = '';
-
-	// Add piece type (except for pawns)
-	if (!isPawn) {
-		notation += move.piece;
-	}
-
-	// Add capture symbol
-	if (move.isCapture && isPawn) {
-		notation += move.from[0];
-	}
-	if (move.isCapture) {
-		notation += 'x';
-	}
-
-	// Add destination square
+	const isPawn = move.piece === 'p' || move.piece === 'P';
+	if (!isPawn) notation += move.piece;
+	if (move.isCapture && isPawn) notation += move.from.file;
+	if (move.isCapture) notation += 'x';
 	notation += move.to;
-
-	// Add promotion
-	if (move.promotion) {
-		notation += '=' + move.promotion.toUpperCase();
-	}
+	if (move.promotion) notation += '=' + move.promotion.toUpperCase();
 
 	return notation;
 }
 
-function parsePosition(position: BoardPosition): [BoardCol, BoardRow] {
-	if (!isBoardPosition(position)) throw new Error('Invalid board position');
-	const col = position[0] as BoardCol;
-	const row = position[1] as BoardRow;
-	return [col, row];
-}
+function getPositionsBetween(from: Position, to: Position): PositionStr[] {
+	const positions: PositionStr[] = [];
 
-function getPieceColor(piece: PieceId): 'w' | 'b' {
-	return piece === piece.toLowerCase() ? 'b' : 'w';
-}
-
-function getColIndex(col: string): number {
-	if (!isBoardCol(col)) throw new Error('Invalid column');
-	return BOARD_COLS.indexOf(col);
-}
-
-function getRowIndex(row: string): number {
-	if (!isBoardRow(row)) throw new Error('Invalid row');
-	return BOARD_ROWS.indexOf(row);
-}
-
-function isValidPosition(position: BoardPosition): boolean {
-	const [col, row] = parsePosition(position);
-	return BOARD_COLS.includes(col) && BOARD_ROWS.includes(row);
-}
-
-function getPositionsBetween(from: BoardPosition, to: BoardPosition): BoardPosition[] {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	const positions: BoardPosition[] = [];
-
-	const fromColIdx = getColIndex(fromCol);
-	const toColIdx = getColIndex(toCol);
-	const fromRowIdx = getRowIndex(fromRow);
-	const toRowIdx = getRowIndex(toRow);
+	const fromFileIdx = from.fileIndex();
+	const toFileIdx = to.fileIndex();
+	const fromRankIdx = from.rankIndex();
+	const toRankIdx = to.rankIndex();
 
 	// Horizontal move
-	if (fromRowIdx === toRowIdx) {
-		const step = fromColIdx < toColIdx ? 1 : -1;
-		for (let i = fromColIdx + step; i !== toColIdx; i += step) {
-			const col = BOARD_COLS[i];
-			if (!col || !isBoardCol(col)) continue;
-			positions.push(`${col}${fromRow}`);
+	if (fromRankIdx === toRankIdx) {
+		const step = fromFileIdx < toFileIdx ? 1 : -1;
+		for (let i = fromFileIdx + step; i !== toFileIdx; i += step) {
+			const file = BOARD_FILES[i];
+			if (!file || !isBoardFile(file)) continue;
+			positions.push(`${file}${from.rank}`);
 		}
 	}
 	// Vertical move
-	else if (fromColIdx === toColIdx) {
-		const step = fromRowIdx < toRowIdx ? 1 : -1;
-		for (let i = fromRowIdx + step; i !== toRowIdx; i += step) {
-			const row = BOARD_ROWS[i];
-			if (!row || !isBoardRow(row)) continue;
-			positions.push(`${fromCol}${row}`);
+	else if (fromFileIdx === toFileIdx) {
+		const step = fromRankIdx < toRankIdx ? 1 : -1;
+		for (let i = fromRankIdx + step; i !== toRankIdx; i += step) {
+			const rank = BOARD_RANKS[i];
+			if (!rank || !isBoardRank(rank)) continue;
+			positions.push(`${from.file}${rank}`);
 		}
 	}
 	// Diagonal move
-	else if (Math.abs(fromColIdx - toColIdx) === Math.abs(fromRowIdx - toRowIdx)) {
-		const colStep = fromColIdx < toColIdx ? 1 : -1;
-		const rowStep = fromRowIdx < toRowIdx ? 1 : -1;
-		let col = fromColIdx + colStep;
-		let row = fromRowIdx + rowStep;
-		while (col !== toColIdx && row !== toRowIdx) {
-			const nextCol = BOARD_COLS[col];
-			const nextRow = BOARD_ROWS[row];
-			if (nextCol && nextRow && isBoardCol(nextCol) && isBoardRow(nextRow)) {
-				positions.push(`${nextCol}${nextRow}`);
+	else if (Math.abs(fromFileIdx - toFileIdx) === Math.abs(fromRankIdx - toRankIdx)) {
+		const fileStep = fromFileIdx < toFileIdx ? 1 : -1;
+		const rankStep = fromRankIdx < toRankIdx ? 1 : -1;
+		let file = fromFileIdx + fileStep;
+		let rank = fromRankIdx + rankStep;
+		while (file !== toFileIdx && rank !== toRankIdx) {
+			const nextFile = BOARD_FILES[file];
+			const nextRank = BOARD_RANKS[rank];
+			if (nextFile && nextRank) {
+				positions.push(`${nextFile}${nextRank}`);
 			}
-			col += colStep;
-			row += rowStep;
+			file += fileStep;
+			rank += rankStep;
 		}
 	}
 
 	return positions;
 }
 
-function isPathClear(from: BoardPosition, to: BoardPosition, board: BoardMap): boolean {
+function isPathClear(from: Position, to: Position, board: BoardMap): boolean {
 	return getPositionsBetween(from, to).every((pos) => !board.has(pos));
 }
 
 function isValidPawnMove(
-	from: BoardPosition,
-	to: BoardPosition,
+	from: Position,
+	to: Position,
 	piece: PieceId,
 	board: BoardMap,
-	enPassantTarget: BoardPosition | null
+	enPassantTarget: Position | null
 ): boolean {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	const fromColIdx = getColIndex(fromCol);
-	const toColIdx = getColIndex(toCol);
-	const fromRowIdx = getRowIndex(fromRow);
-	const toRowIdx = getRowIndex(toRow);
+	const fromFileIdx = from.fileIndex();
+	const toFileIdx = to.fileIndex();
+	const fromRankIdx = from.rankIndex();
+	const toRankIdx = to.rankIndex();
 	const color = getPieceColor(piece);
 	const direction = color === 'w' ? 1 : -1;
-	const startRow = color === 'w' ? '2' : '7';
 
 	// Regular move forward
-	if (fromCol === toCol) {
+	if (from.file === to.file) {
 		// One square forward
-		if (toRowIdx - fromRowIdx === direction) {
+		if (toRankIdx - fromRankIdx === direction) {
 			return !board.has(to);
 		}
 		// Two squares forward from starting position
-		if (fromRow === startRow && toRowIdx - fromRowIdx === 2 * direction) {
+		const startRank = color === 'w' ? '2' : '7';
+		if (from.rank === startRank && toRankIdx - fromRankIdx === 2 * direction) {
 			return !board.has(to) && isPathClear(from, to, board);
 		}
 	}
 	// Capture (including en passant)
-	else if (Math.abs(toColIdx - fromColIdx) === 1 && toRowIdx - fromRowIdx === direction) {
+	else if (Math.abs(toFileIdx - fromFileIdx) === 1 && toRankIdx - fromRankIdx === direction) {
 		return board.has(to) || to === enPassantTarget;
 	}
 
 	return false;
 }
 
-function isValidKnightMove(from: BoardPosition, to: BoardPosition): boolean {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	const colDiff = Math.abs(getColIndex(toCol) - getColIndex(fromCol));
-	const rowDiff = Math.abs(getRowIndex(toRow) - getRowIndex(fromRow));
-	return (colDiff === 2 && rowDiff === 1) || (colDiff === 1 && rowDiff === 2);
+function isValidKnightMove(from: Position, to: Position): boolean {
+	const fileDiff = Math.abs(to.fileIndex() - from.fileIndex());
+	const rankDiff = Math.abs(to.rankIndex() - from.rankIndex());
+	return (fileDiff === 2 && rankDiff === 1) || (fileDiff === 1 && rankDiff === 2);
 }
 
-function isValidBishopMove(from: BoardPosition, to: BoardPosition, board: BoardMap): boolean {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	const colDiff = Math.abs(getColIndex(toCol) - getColIndex(fromCol));
-	const rowDiff = Math.abs(getRowIndex(toRow) - getRowIndex(fromRow));
-	return colDiff === rowDiff && isPathClear(from, to, board);
+function isValidBishopMove(from: Position, to: Position, board: BoardMap): boolean {
+	const fileDiff = Math.abs(to.fileIndex() - from.fileIndex());
+	const rankDiff = Math.abs(to.rankIndex() - from.rankIndex());
+	return fileDiff === rankDiff && isPathClear(from, to, board);
 }
 
-function isValidRookMove(from: BoardPosition, to: BoardPosition, board: BoardMap): boolean {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	return (fromCol === toCol || fromRow === toRow) && isPathClear(from, to, board);
+function isValidRookMove(from: Position, to: Position, board: BoardMap): boolean {
+	return (from.file === to.file || from.rank === to.rank) && isPathClear(from, to, board);
 }
 
-function isValidQueenMove(from: BoardPosition, to: BoardPosition, board: BoardMap): boolean {
+function isValidQueenMove(from: Position, to: Position, board: BoardMap): boolean {
 	return isValidBishopMove(from, to, board) || isValidRookMove(from, to, board);
 }
 
 function isValidKingMove(
-	from: BoardPosition,
-	to: BoardPosition,
+	from: Position,
+	to: Position,
 	piece: PieceId,
 	board: BoardMap,
-	canCastle: FenBoardInfo['canCastle']
+	castling: CastlingRights
 ): { isValid: boolean; castling?: 'king-side' | 'queen-side' } {
-	const [fromCol, fromRow] = parsePosition(from);
-	const [toCol, toRow] = parsePosition(to);
-	const colDiff = Math.abs(getColIndex(toCol) - getColIndex(fromCol));
-	const rowDiff = Math.abs(getRowIndex(toRow) - getRowIndex(fromRow));
+	const fileDiff = Math.abs(to.fileIndex() - from.fileIndex());
+	const rankDiff = Math.abs(to.rankIndex() - from.rankIndex());
 
 	// Regular king move
-	if (colDiff <= 1 && rowDiff <= 1) {
+	if (fileDiff <= 1 && rankDiff <= 1) {
 		return { isValid: true };
 	}
 
 	const color = getPieceColor(piece);
 	if (
-		rowDiff === 0 &&
-		fromRow === (color === 'w' ? '1' : '8') &&
-		fromCol === 'e' &&
+		rankDiff === 0 &&
+		from.rank === (color === 'w' ? '1' : '8') &&
+		from.file === 'e' &&
 		isPathClear(from, to, board)
 	) {
 		// King-side castling
 		if (
-			toCol === 'g' &&
-			((color === 'w' && canCastle.whiteKingSide) || (color === 'b' && canCastle.blackKingSide))
+			to.file === 'g' &&
+			((color === 'w' && castling.whiteKingSide) || (color === 'b' && castling.blackKingSide))
 		) {
 			return { isValid: true, castling: 'king-side' };
 		}
 		// Queen-side castling
 		if (
-			toCol === 'c' &&
-			((color === 'w' && canCastle.whiteQueenSide) || (color === 'b' && canCastle.blackQueenSide))
+			to.file === 'c' &&
+			((color === 'w' && castling.whiteQueenSide) || (color === 'b' && castling.blackQueenSide))
 		) {
 			return { isValid: true, castling: 'queen-side' };
 		}
 	}
 
 	return { isValid: false };
+}
+
+export function applyMove(board: BoardInfo, move: Move): BoardInfo {
+	const isWhiteMove = board.turn === 'w';
+	const newBoard: BoardInfo = {
+		map: board.map.clone(),
+		turn: isWhiteMove ? 'b' : 'w',
+		canCastle: { ...board.canCastle },
+		enPassantTarget: null,
+		halfMoveClock: board.halfMoveClock + 1,
+		fullMoveNumber: isWhiteMove ? board.fullMoveNumber : board.fullMoveNumber + 1
+	};
+
+	if (board.map.get(move.from) !== move.piece) {
+		throw new Error(`Piece at ${move.from} does not match the move piece: ${move.piece}`);
+	}
+	if (move.castling) {
+		applyCastlingMove(newBoard, move);
+		return newBoard;
+	}
+
+	newBoard.map.delete(move.from);
+	if (move.promotion != null) {
+		const promotedPiece = move.promotion;
+		newBoard.map.set(move.to, promotedPiece);
+	} else {
+		newBoard.map.set(move.to, move.piece);
+	}
+
+	updateCastlingRights(newBoard.canCastle, move);
+
+	// Reset half move clock on pawn moves or captures
+	const isPawnMove = move.piece.toLowerCase() === 'p';
+	if (isPawnMove || move.isCapture) {
+		newBoard.halfMoveClock = 0;
+	}
+
+	return newBoard;
+}
+
+function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
+	const isWhiteMove = move.turn === 'w';
+
+	if (move.castling === 'king-side') {
+		const rank = isWhiteMove ? '1' : '8';
+		const king: PieceId = isWhiteMove ? 'K' : 'k';
+		const rook: PieceId = isWhiteMove ? 'R' : 'r';
+
+		newBoard.map.delete(`e${rank}`);
+		newBoard.map.delete(`h${rank}`);
+		newBoard.map.set(`g${rank}`, king);
+		newBoard.map.set(`f${rank}`, rook);
+
+		if (isWhiteMove) {
+			newBoard.canCastle.whiteKingSide = false;
+			newBoard.canCastle.whiteQueenSide = false;
+		} else {
+			newBoard.canCastle.blackKingSide = false;
+			newBoard.canCastle.blackQueenSide = false;
+		}
+		return;
+	}
+
+	if (move.castling === 'queen-side') {
+		const rank = isWhiteMove ? '1' : '8';
+		const king = isWhiteMove ? 'K' : 'k';
+		const rook = isWhiteMove ? 'R' : 'r';
+
+		newBoard.map.delete(`e${rank}`);
+		newBoard.map.delete(`a${rank}`);
+		newBoard.map.set(`c${rank}`, king);
+		newBoard.map.set(`d${rank}`, rook);
+
+		if (isWhiteMove) {
+			newBoard.canCastle.whiteKingSide = false;
+			newBoard.canCastle.whiteQueenSide = false;
+		} else {
+			newBoard.canCastle.blackKingSide = false;
+			newBoard.canCastle.blackQueenSide = false;
+		}
+		return;
+	}
+}
+
+function updateCastlingRights(castling: CastlingRights, move: Move): void {
+	if (move.piece === 'k') {
+		castling.blackKingSide = false;
+		castling.blackQueenSide = false;
+	} else if (move.piece === 'K') {
+		castling.whiteKingSide = false;
+		castling.whiteQueenSide = false;
+	} else if (move.piece === 'r') {
+		if (move.from.equals('a8')) castling.blackQueenSide = false;
+		if (move.from.equals('h8')) castling.blackKingSide = false;
+	} else if (move.piece === 'R') {
+		if (move.from.equals('a1')) castling.whiteQueenSide = false;
+		if (move.from.equals('h1')) castling.whiteKingSide = false;
+	}
 }

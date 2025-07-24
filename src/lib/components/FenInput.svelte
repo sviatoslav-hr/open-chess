@@ -25,6 +25,7 @@
 	}
 
 	$effect(() => {
+		// Cancel pending validation when the component is destroyed
 		return () => debouncedValidate.cancel();
 	});
 </script>

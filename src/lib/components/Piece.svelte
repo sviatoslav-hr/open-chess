@@ -4,11 +4,11 @@
 	import { cn } from '$lib/utils';
 
 	interface Props {
-		className?: string;
+		class?: string;
 		id: PieceId;
 	}
 
-	let { className: classNameInput, id }: Props = $props();
+	let { class: classInput, id }: Props = $props();
 	let pieceSrc = $derived.by(() => {
 		const color = id === id.toLowerCase() ? 'black' : 'white';
 		const pieceType = id.toLowerCase();
@@ -16,6 +16,6 @@
 	});
 </script>
 
-<div class={cn('flex h-20 w-20 items-center justify-center', classNameInput)}>
+<div class={cn('flex h-20 w-20 items-center justify-center', classInput)}>
 	<img draggable="false" src={pieceSrc} alt={id} class="h-16 w-16" />
 </div>

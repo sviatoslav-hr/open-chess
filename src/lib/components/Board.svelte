@@ -1,26 +1,31 @@
 <script lang="ts">
-	import type { BoardPosition } from '$lib/board';
-	import { BOARD_COLS, BOARD_ROWS } from '$lib/board';
+	import {
+		BOARD_FILES,
+		BOARD_RANKS,
+		Position,
+		getPieceColor,
+		type BoardInfo,
+		type PositionStr
+	} from '$lib/board';
 	import Piece from '$lib/components/Piece.svelte';
-	import type { FenBoardInfo } from '$lib/fen';
-	import { constructMove, type Move } from '$lib/moves';
+	import { calculateMove, type Move } from '$lib/moves';
 	import { isEven, isOdd } from '$lib/number';
 	import { cn } from '$lib/utils';
 
 	interface Props {
-		className?: string;
+		class?: string;
 		boardRotated?: boolean;
-		fen: FenBoardInfo;
+		boardInfo: BoardInfo;
 		onMove: (move: Move) => void;
 	}
 
-	let { className: classNameInput, boardRotated, fen, onMove }: Props = $props();
-	let positionMap = $derived.by(() => fen.map);
-	let dragSource: BoardPosition | null = $state(null);
-	let dragTarget: BoardPosition | null = $state(null);
+	let { class: classInput, boardRotated, boardInfo, onMove }: Props = $props();
+	let positionMap = $derived.by(() => boardInfo.map);
+	let dragSource: PositionStr | null = $state(null);
+	let dragTarget: PositionStr | null = $state(null);
 	const showDebugCoords = false;
 
-	function handleDragStart(e: DragEvent, position: BoardPosition) {
+	function handleDragStart(e: DragEvent, position: PositionStr) {
 		dragSource = position;
 		if (e.dataTransfer) {
 			e.dataTransfer.setData('text/plain', '');
@@ -31,52 +36,59 @@
 		dragSource = null;
 		dragTarget = null;
 	}
-	function handleTargetDraggedOver(event: DragEvent, position: BoardPosition) {
+	function handleTargetDraggedOver(event: DragEvent, position: PositionStr) {
 		event.preventDefault();
 		dragTarget = position;
 		if (event.dataTransfer) {
 			event.dataTransfer.dropEffect = 'move';
 		}
 	}
-	function handleDragDroppedOnTarget(event: DragEvent, targetPosition: BoardPosition) {
+	function handleDragDroppedOnTarget(event: DragEvent, targetPosition: PositionStr) {
 		event.preventDefault();
 		if (dragSource === targetPosition) return;
 		if (!dragSource) {
 			console.warn('no drag source for position', targetPosition);
 			return;
 		}
-		const move = constructMove(dragSource, targetPosition, fen);
-		console.log('move', { move });
+		const from = Position.fromStr(dragSource);
+		const to = Position.fromStr(targetPosition);
+		const [move, moveError] = calculateMove(boardInfo, from, to);
 		if (move) {
 			onMove(move);
+		} else {
+			console.error('Invalid move:', moveError);
 		}
 		dragSource = null;
+		dragTarget = null;
 	}
 </script>
 
 <!-- TODO: Make this scale up the screen size. -->
 
-<div class={cn('flex justify-center', classNameInput)}>
+<div class={cn('flex justify-center', classInput)}>
 	<div class={cn('flex h-full w-9 justify-around', boardRotated ? 'flex-col' : 'flex-col-reverse')}>
-		{#each BOARD_ROWS as row}
-			<div class="flex h-20 items-center justify-end pr-4 text-center">{row}</div>
+		{#each BOARD_RANKS as rank}
+			<div class="flex h-20 items-center justify-end pr-4 text-center">{rank}</div>
 		{/each}
 	</div>
 
 	<div class={cn('flex pr-9', boardRotated ? 'flex-col' : 'flex-col-reverse')}>
-		{#each BOARD_ROWS as row, rowIndex}
+		{#each BOARD_RANKS as rank, rowIndex}
 			<div class={cn('flex bg-teal-900', { 'flex-row-reverse': boardRotated })}>
-				{#each BOARD_COLS as col, colIndex}
-					{@const position: BoardPosition = `${col}${row}`}
+				{#each BOARD_FILES as col, colIndex}
+					{@const position: PositionStr = `${col}${rank}`}
 					{@const piece = positionMap.get(position)}
+					{@const pieceColor = piece && getPieceColor(piece)}
+					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
+					{@const isDraggedFrom = dragSource === position && dragSource !== dragTarget}
 					<div
 						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
 							'bg-teal-500': isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1),
-							'border-t': row === (boardRotated ? '1' : '8'),
-							'border-b': row === (boardRotated ? '8' : '1'),
+							'border-t': rank === (boardRotated ? '1' : '8'),
+							'border-b': rank === (boardRotated ? '8' : '1'),
 							'border-r': col === (boardRotated ? 'a' : 'h'),
 							'border-l': col === (boardRotated ? 'h' : 'a'),
-							'z-69 rounded-sm outline-4 outline-red-600': dragTarget === position
+							'z-69 rounded-sm outline-4 outline-red-600': isDraggedOver
 						})}
 						data-position={position}
 						role="gridcell"
@@ -86,16 +98,14 @@
 						ondragenter={(e) => e.preventDefault()}
 					>
 						{#if showDebugCoords}
-							<div class="absolute top-1 left-1">{col}{row}</div>
+							<div class="absolute top-1 left-1">{col}{rank}</div>
 						{/if}
 						{#if piece}
 							<div
-								class={cn({
-									'z-42 rounded-xs outline-2 outline-indigo-500': dragSource === position
-								})}
+								class={cn({ 'z-42 rounded-xs outline-2 outline-indigo-500': isDraggedFrom })}
 								role="button"
 								tabindex="0"
-								draggable="true"
+								draggable={boardInfo.turn === pieceColor}
 								ondragstart={(e) => handleDragStart(e, position)}
 								ondragend={handleDragEnd}
 							>
@@ -110,7 +120,7 @@
 </div>
 
 <div class={cn('flex justify-center px-9', { 'flex-row-reverse': boardRotated })}>
-	{#each BOARD_COLS as col}
+	{#each BOARD_FILES as col}
 		<div class="w-20 pt-2 text-center">{col}</div>
 	{/each}
 </div>
