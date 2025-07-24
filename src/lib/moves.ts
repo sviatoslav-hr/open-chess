@@ -1,18 +1,20 @@
 import {
 	BOARD_FILES,
 	BOARD_RANKS,
-	getPieceColor,
+	EnPassantRank,
+	InitialRank,
 	isBoardFile,
 	isBoardRank,
+	PlayerColor,
 	Position,
+	PromotionRank,
 	type BoardInfo,
 	type BoardMap,
 	type BoardRank,
 	type CastlingRights,
-	type PlayerColor,
 	type PositionStr
 } from '$lib/board';
-import type { PieceId } from '$lib/piece';
+import { PieceId, type PromotionPieceId } from '$lib/piece';
 
 export interface Move {
 	from: Position;
@@ -23,7 +25,7 @@ export interface Move {
 	isCapture: boolean;
 	castling?: 'king-side' | 'queen-side';
 	isEnPassantCapture?: boolean;
-	promotion?: 'q' | 'r' | 'b' | 'n' | 'Q' | 'R' | 'B' | 'N';
+	promotion?: PromotionPieceId;
 }
 
 type MoveError =
@@ -46,13 +48,13 @@ export function calculateMove(
 		throw new Error(`No piece at position ${from}`);
 	}
 
-	const pieceColor = getPieceColor(piece);
+	const pieceColor = PieceId.getColor(piece);
 	if (pieceColor !== board.turn) {
 		return [null, { type: 'notYourTurn' }];
 	}
 
 	const targetPiece = board.map.get(to);
-	if (targetPiece && pieceColor === getPieceColor(targetPiece)) {
+	if (targetPiece && pieceColor === PieceId.getColor(targetPiece)) {
 		return [null, { type: 'captureOwnPiece' }];
 	}
 
@@ -62,29 +64,29 @@ export function calculateMove(
 
 	// Validate move based on piece type
 	switch (piece) {
-		case 'P':
-		case 'p':
+		case PieceId.BLACK_PAWN:
+		case PieceId.WHITE_PAWN:
 			isValid = isValidPawnMove(from, to, piece, board.map, board.enPassantTarget);
 			isEnPassantCapture = isValid && Boolean(board.enPassantTarget?.equals(to));
 			break;
-		case 'N':
-		case 'n':
+		case PieceId.BLACK_KNIGHT:
+		case PieceId.WHITE_KNIGHT:
 			isValid = isValidKnightMove(from, to);
 			break;
-		case 'B':
-		case 'b':
+		case PieceId.BLACK_BISHOP:
+		case PieceId.WHITE_BISHOP:
 			isValid = isValidBishopMove(from, to, board.map);
 			break;
-		case 'R':
-		case 'r':
+		case PieceId.BLACK_ROOK:
+		case PieceId.WHITE_ROOK:
 			isValid = isValidRookMove(from, to, board.map);
 			break;
-		case 'Q':
-		case 'q':
+		case PieceId.BLACK_QUEEN:
+		case PieceId.WHITE_QUEEN:
 			isValid = isValidQueenMove(from, to, board.map);
 			break;
-		case 'K':
-		case 'k': {
+		case PieceId.BLACK_KING:
+		case PieceId.WHITE_KING: {
 			const result = isValidKingMove(from, to, piece, board.map, board.canCastle);
 			isValid = result.isValid;
 			castling = result.castling;
@@ -98,8 +100,8 @@ export function calculateMove(
 
 	// Check if pawn move requires promotion
 	const promotion =
-		(piece === 'p' && to.rank === '1' && 'q') ||
-		(piece === 'P' && to.rank === '8' && 'Q') ||
+		(piece === PieceId.BLACK_PAWN && to.rank === PromotionRank.BLACK && PieceId.BLACK_QUEEN) ||
+		(piece === PieceId.WHITE_PAWN && to.rank === PromotionRank.WHITE && PieceId.WHITE_QUEEN) ||
 		undefined;
 
 	const move: Move = {
@@ -123,7 +125,7 @@ function moveToAlgebraic(move: Move): string {
 	}
 
 	let notation = '';
-	const isPawn = move.piece === 'p' || move.piece === 'P';
+	const isPawn = PieceId.isPawn(move.piece);
 	if (!isPawn) notation += move.piece;
 	if (move.isCapture && isPawn) notation += move.from.file;
 	if (move.isCapture) notation += 'x';
@@ -194,8 +196,8 @@ function isValidPawnMove(
 	const toFileIdx = to.fileIndex();
 	const fromRankIdx = from.rankIndex();
 	const toRankIdx = to.rankIndex();
-	const color = getPieceColor(piece);
-	const direction = color === 'w' ? 1 : -1;
+	const isWhite = PieceId.isWhite(piece);
+	const direction = isWhite ? 1 : -1;
 
 	// Regular move forward
 	if (from.file === to.file) {
@@ -204,7 +206,7 @@ function isValidPawnMove(
 			return !board.has(to);
 		}
 		// Two squares forward from starting position
-		const startRank = color === 'w' ? '2' : '7';
+		const startRank = isWhite ? '2' : '7';
 		if (from.rank === startRank && toRankIdx - fromRankIdx === 2 * direction) {
 			return !board.has(to) && isPathClear(from, to, board);
 		}
@@ -252,24 +254,24 @@ function isValidKingMove(
 		return { isValid: true };
 	}
 
-	const color = getPieceColor(piece);
+	const isWhite = PieceId.isWhite(piece);
 	if (
 		rankDiff === 0 &&
-		from.rank === (color === 'w' ? '1' : '8') &&
+		from.rank === (isWhite ? InitialRank.WHITE : InitialRank.BLACK) &&
 		from.file === 'e' &&
 		isPathClear(from, to, board)
 	) {
 		// King-side castling
 		if (
 			to.file === 'g' &&
-			((color === 'w' && castling.whiteKingSide) || (color === 'b' && castling.blackKingSide))
+			((isWhite && castling.whiteKingSide) || (!isWhite && castling.blackKingSide))
 		) {
 			return { isValid: true, castling: 'king-side' };
 		}
 		// Queen-side castling
 		if (
 			to.file === 'c' &&
-			((color === 'w' && castling.whiteQueenSide) || (color === 'b' && castling.blackQueenSide))
+			((isWhite && castling.whiteQueenSide) || (!isWhite && castling.blackQueenSide))
 		) {
 			return { isValid: true, castling: 'queen-side' };
 		}
@@ -279,10 +281,10 @@ function isValidKingMove(
 }
 
 export function applyMove(board: BoardInfo, move: Move): BoardInfo {
-	const isWhiteMove = board.turn === 'w';
+	const isWhiteMove = board.turn === PlayerColor.WHITE;
 	const newBoard: BoardInfo = {
 		map: board.map.clone(),
-		turn: isWhiteMove ? 'b' : 'w',
+		turn: isWhiteMove ? PlayerColor.BLACK : PlayerColor.WHITE,
 		canCastle: { ...board.canCastle },
 		enPassantTarget: null,
 		halfMoveClock: board.halfMoveClock + 1,
@@ -315,13 +317,13 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 	updateCastlingRights(newBoard.canCastle, move);
 
 	// Reset half move clock on pawn moves or captures
-	const isPawnMove = move.piece.toLowerCase() === 'p';
+	const isPawnMove = PieceId.isPawn(move.piece);
 	if (isPawnMove || move.isCapture) {
 		newBoard.halfMoveClock = 0;
 	}
 	// When a pawn moves two squares forward, it can be captured via en passant
 	if (isPawnMove && Math.abs(move.from.rankIndex() - move.to.rankIndex()) == 2) {
-		const rank: BoardRank = isWhiteMove ? '3' : '6';
+		const rank: BoardRank = isWhiteMove ? EnPassantRank.WHITE : EnPassantRank.BLACK;
 		newBoard.enPassantTarget = Position.make(move.from.file, rank);
 	}
 
@@ -329,12 +331,12 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 }
 
 function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
-	const isWhiteMove = move.turn === 'w';
+	const isWhiteMove = move.turn === PlayerColor.WHITE;
 
 	if (move.castling === 'king-side') {
 		const rank = isWhiteMove ? '1' : '8';
-		const king: PieceId = isWhiteMove ? 'K' : 'k';
-		const rook: PieceId = isWhiteMove ? 'R' : 'r';
+		const king = isWhiteMove ? PieceId.WHITE_KING : PieceId.BLACK_KING;
+		const rook = isWhiteMove ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK;
 
 		newBoard.map.delete(`e${rank}`);
 		newBoard.map.delete(`h${rank}`);
@@ -353,8 +355,8 @@ function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
 
 	if (move.castling === 'queen-side') {
 		const rank = isWhiteMove ? '1' : '8';
-		const king = isWhiteMove ? 'K' : 'k';
-		const rook = isWhiteMove ? 'R' : 'r';
+		const king = isWhiteMove ? PieceId.WHITE_KING : PieceId.BLACK_KING;
+		const rook = isWhiteMove ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK;
 
 		newBoard.map.delete(`e${rank}`);
 		newBoard.map.delete(`a${rank}`);
@@ -373,16 +375,16 @@ function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
 }
 
 function updateCastlingRights(castling: CastlingRights, move: Move): void {
-	if (move.piece === 'k') {
+	if (move.piece === PieceId.BLACK_KING) {
 		castling.blackKingSide = false;
 		castling.blackQueenSide = false;
-	} else if (move.piece === 'K') {
+	} else if (move.piece === PieceId.WHITE_KING) {
 		castling.whiteKingSide = false;
 		castling.whiteQueenSide = false;
-	} else if (move.piece === 'r') {
+	} else if (move.piece === PieceId.BLACK_ROOK) {
 		if (move.from.equals('a8')) castling.blackQueenSide = false;
 		if (move.from.equals('h8')) castling.blackKingSide = false;
-	} else if (move.piece === 'R') {
+	} else if (move.piece === PieceId.WHITE_ROOK) {
 		if (move.from.equals('a1')) castling.whiteQueenSide = false;
 		if (move.from.equals('h1')) castling.whiteKingSide = false;
 	}

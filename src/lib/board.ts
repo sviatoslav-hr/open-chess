@@ -2,11 +2,19 @@ import type { PieceId } from '$lib/piece';
 
 export const BOARD_RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'] as const;
 export const BOARD_FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
+export const InitialRank = { WHITE: '1', BLACK: '8' } as const;
+export const PromotionRank = { WHITE: '8', BLACK: '1' } as const;
+export const EnPassantRank = { WHITE: '3', BLACK: '6' } as const;
 
 export type BoardRank = (typeof BOARD_RANKS)[number];
 export type BoardFile = (typeof BOARD_FILES)[number];
 export type PositionStr = `${BoardFile}${BoardRank}`;
-export type PlayerColor = 'w' | 'b';
+
+export const PlayerColor = {
+	WHITE: 'white' as const,
+	BLACK: 'black' as const
+};
+export type PlayerColor = (typeof PlayerColor)[keyof typeof PlayerColor];
 
 export class Position {
 	file: BoardFile;
@@ -60,10 +68,6 @@ export function isBoardFile(col: string): col is BoardFile {
 export function isPositionStr(pos: string): pos is PositionStr {
 	if (pos.length !== 2) return false;
 	return isBoardFile(pos[0]) && isBoardRank(pos[1]);
-}
-
-export function getPieceColor(piece: PieceId): PlayerColor {
-	return piece === piece.toLowerCase() ? 'b' : 'w';
 }
 
 // @CLEANUP: unused?

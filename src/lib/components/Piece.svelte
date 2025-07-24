@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import type { PieceId } from '$lib/piece';
+	import { PieceId } from '$lib/piece';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -10,7 +10,7 @@
 
 	let { class: classInput, id }: Props = $props();
 	let pieceSrc = $derived.by(() => {
-		const color = id === id.toLowerCase() ? 'black' : 'white';
+		const color = PieceId.isWhite(id) ? 'white' : 'black';
 		const pieceType = id.toLowerCase();
 		return `${base}/piece_${pieceType}_${color}.svg`;
 	});

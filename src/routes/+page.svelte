@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PlayerColor } from '$lib/board';
 	import Board from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
@@ -33,6 +34,6 @@
 
 	<div class="fixed top-4 right-4 flex flex-col justify-center gap-2">
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
-		<div>{boardInfo.turn === 'b' ? 'Black' : 'White'}'s turn</div>
+		<div>{boardInfo.turn === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
 	</div>
 </main>

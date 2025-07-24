@@ -1,15 +1,9 @@
 <script lang="ts">
-	import {
-		BOARD_FILES,
-		BOARD_RANKS,
-		Position,
-		getPieceColor,
-		type BoardInfo,
-		type PositionStr
-	} from '$lib/board';
+	import { BOARD_FILES, BOARD_RANKS, Position, type BoardInfo, type PositionStr } from '$lib/board';
 	import Piece from '$lib/components/Piece.svelte';
 	import { calculateMove, type Move } from '$lib/moves';
 	import { isEven, isOdd } from '$lib/number';
+	import { PieceId } from '$lib/piece';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -79,7 +73,7 @@
 				{#each BOARD_FILES as col, colIndex}
 					{@const position: PositionStr = `${col}${rank}`}
 					{@const piece = positionMap.get(position)}
-					{@const pieceColor = piece && getPieceColor(piece)}
+					{@const pieceColor = piece && PieceId.getColor(piece)}
 					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
 					{@const isDraggedFrom = dragSource === position && dragSource !== dragTarget}
 					<div

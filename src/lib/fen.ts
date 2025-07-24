@@ -2,12 +2,13 @@ import {
 	BOARD_FILES,
 	BOARD_RANKS,
 	BoardMap,
+	PlayerColor,
 	Position,
 	isPositionStr,
 	type BoardInfo
 } from '$lib/board';
 import { isNumberChar } from '$lib/number';
-import { isValidPieceId } from '$lib/piece';
+import { PieceId } from '$lib/piece';
 
 export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -29,7 +30,7 @@ export function validateFen(fen: string): boolean {
 			if (!isNaN(Number(char))) {
 				sum += Number(char);
 			} else {
-				if (!isValidPieceId(char.toLowerCase())) {
+				if (!PieceId.isPiece(char.toLowerCase())) {
 					return false;
 				}
 				sum += 1;
@@ -113,7 +114,7 @@ export function parseFen(fen: string): BoardInfo {
 				colIndex += Number(char);
 				continue;
 			}
-			if (!isValidPieceId(char)) throw new Error(`Invalid piece ID in FEN string: ${char}`);
+			if (!PieceId.isPiece(char)) throw new Error(`Invalid piece ID in FEN string: ${char}`);
 			const col = BOARD_FILES[colIndex];
 			if (!col) throw new Error(`Invalid column index in FEN string: ${colIndex}`);
 			const row = BOARD_RANKS[rowIndex];
@@ -124,7 +125,7 @@ export function parseFen(fen: string): BoardInfo {
 		}
 	}
 
-	const turn = turnStr === 'w' ? 'w' : 'b';
+	const turn = turnStr === 'w' ? PlayerColor.WHITE : PlayerColor.BLACK;
 	const canCastle = {
 		whiteKingSide: castlingRightsStr.includes('K'),
 		whiteQueenSide: castlingRightsStr.includes('Q'),
