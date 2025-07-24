@@ -98,8 +98,8 @@ export function calculateMove(
 
 	// Check if pawn move requires promotion
 	const promotion =
-		(piece === 'p' && to.rank === '8' && 'q') ||
-		(piece === 'P' && to.rank === '1' && 'Q') ||
+		(piece === 'p' && to.rank === '1' && 'q') ||
+		(piece === 'P' && to.rank === '8' && 'Q') ||
 		undefined;
 
 	const move: Move = {
