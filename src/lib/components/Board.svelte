@@ -14,7 +14,7 @@
 	}
 
 	let { class: classInput, boardRotated, boardInfo, onMove }: Props = $props();
-	let positionMap = $derived.by(() => boardInfo.map);
+	let boardPieces = $derived.by(() => boardInfo.pieces);
 	let dragSource: PositionStr | null = $state(null);
 	let dragTarget: PositionStr | null = $state(null);
 	const showDebugCoords = false;
@@ -72,7 +72,7 @@
 			<div class={cn('flex bg-teal-900', { 'flex-row-reverse': boardRotated })}>
 				{#each BOARD_FILES as col, colIndex}
 					{@const position: PositionStr = `${col}${rank}`}
-					{@const piece = positionMap.get(position)}
+					{@const piece = boardPieces.get(position)}
 					{@const pieceColor = piece && PieceId.getColor(piece)}
 					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
 					{@const isDraggedFrom = dragSource === position && dragSource !== dragTarget}

@@ -43,7 +43,7 @@ export function calculateMove(
 	from: Position,
 	to: Position
 ): Either<Move, MoveError> {
-	const piece = board.map.get(from);
+	const piece = board.pieces.get(from);
 	if (!piece) {
 		throw new Error(`No piece at position ${from}`);
 	}
@@ -53,7 +53,7 @@ export function calculateMove(
 		return [null, { type: 'notYourTurn' }];
 	}
 
-	const targetPiece = board.map.get(to);
+	const targetPiece = board.pieces.get(to);
 	if (targetPiece && pieceColor === PieceId.getColor(targetPiece)) {
 		return [null, { type: 'captureOwnPiece' }];
 	}
@@ -66,7 +66,7 @@ export function calculateMove(
 	switch (piece) {
 		case PieceId.BLACK_PAWN:
 		case PieceId.WHITE_PAWN:
-			isValid = isValidPawnMove(from, to, piece, board.map, board.enPassantTarget);
+			isValid = isValidPawnMove(from, to, piece, board.pieces, board.enPassantTarget);
 			isEnPassantCapture = isValid && Boolean(board.enPassantTarget?.equals(to));
 			break;
 		case PieceId.BLACK_KNIGHT:
@@ -75,19 +75,19 @@ export function calculateMove(
 			break;
 		case PieceId.BLACK_BISHOP:
 		case PieceId.WHITE_BISHOP:
-			isValid = isValidBishopMove(from, to, board.map);
+			isValid = isValidBishopMove(from, to, board.pieces);
 			break;
 		case PieceId.BLACK_ROOK:
 		case PieceId.WHITE_ROOK:
-			isValid = isValidRookMove(from, to, board.map);
+			isValid = isValidRookMove(from, to, board.pieces);
 			break;
 		case PieceId.BLACK_QUEEN:
 		case PieceId.WHITE_QUEEN:
-			isValid = isValidQueenMove(from, to, board.map);
+			isValid = isValidQueenMove(from, to, board.pieces);
 			break;
 		case PieceId.BLACK_KING:
 		case PieceId.WHITE_KING: {
-			const result = isValidKingMove(from, to, piece, board.map, board.canCastle);
+			const result = isValidKingMove(from, to, piece, board.pieces, board.canCastle);
 			isValid = result.isValid;
 			castling = result.castling;
 			break;
@@ -181,7 +181,7 @@ function getPositionsBetween(from: Position, to: Position): PositionStr[] {
 	return positions;
 }
 
-function isPathClear(from: Position, to: Position, board: BoardMap): boolean {
+function isPathClear(from: Position, to: Position, board: BoardMap<PieceId>): boolean {
 	return getPositionsBetween(from, to).every((pos) => !board.has(pos));
 }
 
@@ -189,7 +189,7 @@ function isValidPawnMove(
 	from: Position,
 	to: Position,
 	piece: PieceId,
-	board: BoardMap,
+	board: BoardMap<PieceId>,
 	enPassantTarget: Position | null
 ): boolean {
 	const fromFileIdx = from.fileIndex();
@@ -225,17 +225,17 @@ function isValidKnightMove(from: Position, to: Position): boolean {
 	return (fileDiff === 2 && rankDiff === 1) || (fileDiff === 1 && rankDiff === 2);
 }
 
-function isValidBishopMove(from: Position, to: Position, board: BoardMap): boolean {
+function isValidBishopMove(from: Position, to: Position, board: BoardMap<PieceId>): boolean {
 	const fileDiff = Math.abs(to.fileIndex() - from.fileIndex());
 	const rankDiff = Math.abs(to.rankIndex() - from.rankIndex());
 	return fileDiff === rankDiff && isPathClear(from, to, board);
 }
 
-function isValidRookMove(from: Position, to: Position, board: BoardMap): boolean {
+function isValidRookMove(from: Position, to: Position, board: BoardMap<PieceId>): boolean {
 	return (from.file === to.file || from.rank === to.rank) && isPathClear(from, to, board);
 }
 
-function isValidQueenMove(from: Position, to: Position, board: BoardMap): boolean {
+function isValidQueenMove(from: Position, to: Position, board: BoardMap<PieceId>): boolean {
 	return isValidBishopMove(from, to, board) || isValidRookMove(from, to, board);
 }
 
@@ -243,7 +243,7 @@ function isValidKingMove(
 	from: Position,
 	to: Position,
 	piece: PieceId,
-	board: BoardMap,
+	board: BoardMap<PieceId>,
 	castling: CastlingRights
 ): { isValid: boolean; castling?: 'king-side' | 'queen-side' } {
 	const fileDiff = Math.abs(to.fileIndex() - from.fileIndex());
@@ -283,7 +283,7 @@ function isValidKingMove(
 export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 	const isWhiteMove = board.turn === PlayerColor.WHITE;
 	const newBoard: BoardInfo = {
-		map: board.map.clone(),
+		pieces: board.pieces.clone(),
 		turn: isWhiteMove ? PlayerColor.BLACK : PlayerColor.WHITE,
 		canCastle: { ...board.canCastle },
 		enPassantTarget: null,
@@ -291,7 +291,7 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 		fullMoveNumber: isWhiteMove ? board.fullMoveNumber : board.fullMoveNumber + 1
 	};
 
-	if (board.map.get(move.from) !== move.piece) {
+	if (board.pieces.get(move.from) !== move.piece) {
 		throw new Error(`Piece at ${move.from} does not match the move piece: ${move.piece}`);
 	}
 	if (move.castling) {
@@ -299,19 +299,19 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 		return newBoard;
 	}
 
-	newBoard.map.delete(move.from);
+	newBoard.pieces.delete(move.from);
 
 	if (move.isEnPassantCapture) {
 		const capturedPawnRank = move.from.rank;
 		const capturedPawnPos: PositionStr = `${move.to.file}${capturedPawnRank}`;
-		newBoard.map.delete(capturedPawnPos);
+		newBoard.pieces.delete(capturedPawnPos);
 	}
 
 	if (move.promotion != null) {
 		const promotedPiece = move.promotion;
-		newBoard.map.set(move.to, promotedPiece);
+		newBoard.pieces.set(move.to, promotedPiece);
 	} else {
-		newBoard.map.set(move.to, move.piece);
+		newBoard.pieces.set(move.to, move.piece);
 	}
 
 	updateCastlingRights(newBoard.canCastle, move);
@@ -338,10 +338,10 @@ function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
 		const king = isWhiteMove ? PieceId.WHITE_KING : PieceId.BLACK_KING;
 		const rook = isWhiteMove ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK;
 
-		newBoard.map.delete(`e${rank}`);
-		newBoard.map.delete(`h${rank}`);
-		newBoard.map.set(`g${rank}`, king);
-		newBoard.map.set(`f${rank}`, rook);
+		newBoard.pieces.delete(`e${rank}`);
+		newBoard.pieces.delete(`h${rank}`);
+		newBoard.pieces.set(`g${rank}`, king);
+		newBoard.pieces.set(`f${rank}`, rook);
 
 		if (isWhiteMove) {
 			newBoard.canCastle.whiteKingSide = false;
@@ -358,10 +358,10 @@ function applyCastlingMove(newBoard: BoardInfo, move: Move): void {
 		const king = isWhiteMove ? PieceId.WHITE_KING : PieceId.BLACK_KING;
 		const rook = isWhiteMove ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK;
 
-		newBoard.map.delete(`e${rank}`);
-		newBoard.map.delete(`a${rank}`);
-		newBoard.map.set(`c${rank}`, king);
-		newBoard.map.set(`d${rank}`, rook);
+		newBoard.pieces.delete(`e${rank}`);
+		newBoard.pieces.delete(`a${rank}`);
+		newBoard.pieces.set(`c${rank}`, king);
+		newBoard.pieces.set(`d${rank}`, rook);
 
 		if (isWhiteMove) {
 			newBoard.canCastle.whiteKingSide = false;

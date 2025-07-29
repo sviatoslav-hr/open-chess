@@ -50,7 +50,7 @@ export function boardToFen(fen: BoardInfo): string {
 		let emptyCount = 0;
 
 		for (const col of BOARD_FILES) {
-			const piece = fen.map.get(`${col}${row}`);
+			const piece = fen.pieces.get(`${col}${row}`);
 			if (piece) {
 				if (emptyCount > 0) {
 					rowStr += emptyCount;
@@ -104,7 +104,7 @@ export function parseFen(fen: string): BoardInfo {
 	}
 	fenRows.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
 
-	const map: BoardMap = new BoardMap();
+	const pieces = new BoardMap<PieceId>();
 	for (let rowIndex = fenRows.length - 1; rowIndex >= 0; rowIndex--) {
 		const rowStr = fenRows[rowIndex];
 
@@ -120,7 +120,7 @@ export function parseFen(fen: string): BoardInfo {
 			const row = BOARD_RANKS[rowIndex];
 			if (!row) throw new Error(`Invalid row index in FEN string: ${rowIndex}`);
 
-			map.set(`${col}${row}`, char);
+			pieces.set(`${col}${row}`, char);
 			colIndex += 1;
 		}
 	}
@@ -151,5 +151,5 @@ export function parseFen(fen: string): BoardInfo {
 		throw new Error(`Invalid full move number in FEN string: ${fullMoveNumber}`);
 	}
 
-	return { map, turn, canCastle, enPassantTarget, halfMoveClock, fullMoveNumber };
+	return { pieces, turn, canCastle, enPassantTarget, halfMoveClock, fullMoveNumber };
 }
