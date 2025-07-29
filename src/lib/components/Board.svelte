@@ -100,7 +100,7 @@
 								class={cn({ 'z-42 rounded-xs outline-2 outline-indigo-500': isDraggedFrom })}
 								role="button"
 								tabindex="0"
-								draggable={boardInfo.turn === pieceColor}
+								draggable={boardInfo.turnColor === pieceColor}
 								ondragstart={(e) => handleDragStart(e, position)}
 								ondragend={handleDragEnd}
 							>

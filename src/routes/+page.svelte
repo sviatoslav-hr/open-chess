@@ -34,6 +34,6 @@
 
 	<div class="fixed top-4 right-4 flex flex-col justify-center gap-2">
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
-		<div>{boardInfo.turn === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
+		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
 	</div>
 </main>

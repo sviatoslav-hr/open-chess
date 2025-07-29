@@ -88,18 +88,23 @@ export interface CastlingRights {
 
 export interface BoardInfo {
 	pieces: BoardMap<PieceId>;
-	turn: PlayerColor;
+	turnColor: PlayerColor;
 	canCastle: CastlingRights;
 	enPassantTarget: Position | null;
 	halfMoveClock: number;
 	fullMoveNumber: number;
+	allowedMoves: BoardMap<Position[]>;
 }
 
 export class BoardMap<T> {
-	map: Map<PositionStr, T> = new Map();
+	private map: Map<PositionStr, T> = new Map();
 
 	constructor(map?: Map<PositionStr, T>) {
 		this.map = map ?? new Map<PositionStr, T>();
+	}
+
+	get size(): number {
+		return this.map.size;
 	}
 
 	get(position: Position | PositionStr): T | undefined {
@@ -124,6 +129,19 @@ export class BoardMap<T> {
 
 	clone(): BoardMap<T> {
 		return new BoardMap(new Map(this.map));
+	}
+
+	[Symbol.iterator](): MapIterator<[PositionStr, T]> {
+		return this.map[Symbol.iterator]();
+	}
+
+	findPositionFor(value: T): PositionStr | undefined {
+		for (const [key, val] of this.map.entries()) {
+			if (val === value) {
+				return key;
+			}
+		}
+		return undefined;
 	}
 
 	private makePositionKey(positionOrFile: Position | PositionStr): PositionStr {

@@ -7,6 +7,7 @@ import {
 	isPositionStr,
 	type BoardInfo
 } from '$lib/board';
+import { fillAllowedMoves } from '$lib/moves';
 import { isNumberChar } from '$lib/number';
 import { PieceId } from '$lib/piece';
 
@@ -68,7 +69,7 @@ export function boardToFen(fen: BoardInfo): string {
 	}
 
 	const placement = rows.join('/');
-	const turn = fen.turn;
+	const turn = fen.turnColor;
 
 	let castling = '';
 	if (fen.canCastle.whiteKingSide) castling += 'K';
@@ -125,7 +126,7 @@ export function parseFen(fen: string): BoardInfo {
 		}
 	}
 
-	const turn = turnStr === 'w' ? PlayerColor.WHITE : PlayerColor.BLACK;
+	const turnColor = turnStr === 'w' ? PlayerColor.WHITE : PlayerColor.BLACK;
 	const canCastle = {
 		whiteKingSide: castlingRightsStr.includes('K'),
 		whiteQueenSide: castlingRightsStr.includes('Q'),
@@ -151,5 +152,17 @@ export function parseFen(fen: string): BoardInfo {
 		throw new Error(`Invalid full move number in FEN string: ${fullMoveNumber}`);
 	}
 
-	return { pieces, turn, canCastle, enPassantTarget, halfMoveClock, fullMoveNumber };
+	const board: BoardInfo = {
+		pieces,
+		turnColor,
+		canCastle,
+		enPassantTarget,
+		halfMoveClock,
+		fullMoveNumber,
+		allowedMoves: new BoardMap()
+	};
+
+	fillAllowedMoves(board);
+
+	return board;
 }

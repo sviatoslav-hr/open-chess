@@ -73,6 +73,7 @@ function isKnight(val: string): val is typeof PieceId.BLACK_KNIGHT | typeof Piec
 }
 
 function getPieceColor(piece: PieceId): PlayerColor {
+	// PERF: Checking char code might be faster...
 	return piece === piece.toLowerCase() ? PlayerColor.BLACK : PlayerColor.WHITE;
 }
 

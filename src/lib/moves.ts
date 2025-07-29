@@ -1,6 +1,7 @@
 import {
 	BOARD_FILES,
 	BOARD_RANKS,
+	BoardMap,
 	EnPassantRank,
 	InitialRank,
 	isBoardFile,
@@ -9,7 +10,6 @@ import {
 	Position,
 	PromotionRank,
 	type BoardInfo,
-	type BoardMap,
 	type BoardRank,
 	type CastlingRights,
 	type PositionStr
@@ -49,7 +49,7 @@ export function calculateMove(
 	}
 
 	const pieceColor = PieceId.getColor(piece);
-	if (pieceColor !== board.turn) {
+	if (pieceColor !== board.turnColor) {
 		return [null, { type: 'notYourTurn' }];
 	}
 
@@ -281,14 +281,15 @@ function isValidKingMove(
 }
 
 export function applyMove(board: BoardInfo, move: Move): BoardInfo {
-	const isWhiteMove = board.turn === PlayerColor.WHITE;
+	const isWhiteMove = board.turnColor === PlayerColor.WHITE;
 	const newBoard: BoardInfo = {
 		pieces: board.pieces.clone(),
-		turn: isWhiteMove ? PlayerColor.BLACK : PlayerColor.WHITE,
+		turnColor: isWhiteMove ? PlayerColor.BLACK : PlayerColor.WHITE,
 		canCastle: { ...board.canCastle },
 		enPassantTarget: null,
 		halfMoveClock: board.halfMoveClock + 1,
-		fullMoveNumber: isWhiteMove ? board.fullMoveNumber : board.fullMoveNumber + 1
+		fullMoveNumber: isWhiteMove ? board.fullMoveNumber : board.fullMoveNumber + 1,
+		allowedMoves: new BoardMap()
 	};
 
 	if (board.pieces.get(move.from) !== move.piece) {
@@ -327,6 +328,7 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 		newBoard.enPassantTarget = Position.make(move.from.file, rank);
 	}
 
+	fillAllowedMoves(board);
 	return newBoard;
 }
 
@@ -388,4 +390,15 @@ function updateCastlingRights(castling: CastlingRights, move: Move): void {
 		if (move.from.equals('a1')) castling.whiteQueenSide = false;
 		if (move.from.equals('h1')) castling.whiteKingSide = false;
 	}
+}
+
+export function fillAllowedMoves(board: BoardInfo): void {
+	if (board.allowedMoves.size) {
+		throw new Error('Allowed moves already calculated');
+	}
+	const allowedMoves = board.allowedMoves;
+
+	// 1. Check if the king is in check and filter moves accordingly
+	// 2. For each piece, calculate all possible moves
+	// 3. Filter out moves that would leave the king in check
 }
