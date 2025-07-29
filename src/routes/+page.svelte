@@ -20,8 +20,6 @@
 		boardInfo = applyMove(boardInfo, move);
 		const newFenStr = boardToFen(boardInfo);
 		currentFenStr = newFenStr;
-		// @CLEANUP:
-		console.debug('onMove: newFen', { move, boardInfo, newFenStr });
 	}
 </script>
 

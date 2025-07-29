@@ -17,6 +17,10 @@
 	let boardPieces = $derived.by(() => boardInfo.pieces);
 	let dragSource: PositionStr | null = $state(null);
 	let dragTarget: PositionStr | null = $state(null);
+	let allowedMoves: PositionStr[] | null = $derived.by(() => {
+		if (!dragSource) return null;
+		return boardInfo.allowedMoves.get(dragSource)?.map((m) => m.toString()) ?? null;
+	});
 	const showDebugCoords = false;
 
 	function handleDragStart(e: DragEvent, position: PositionStr) {
@@ -76,6 +80,8 @@
 					{@const pieceColor = piece && PieceId.getColor(piece)}
 					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
 					{@const isDraggedFrom = dragSource === position && dragSource !== dragTarget}
+					{@const isValidMoveDest =
+						dragSource && !isDraggedOver && allowedMoves?.includes(position)}
 					<div
 						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
 							'bg-teal-500': isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1),
@@ -83,7 +89,8 @@
 							'border-b': rank === (boardRotated ? '8' : '1'),
 							'border-r': col === (boardRotated ? 'a' : 'h'),
 							'border-l': col === (boardRotated ? 'h' : 'a'),
-							'z-69 rounded-sm outline-4 outline-red-600': isDraggedOver
+							'z-69 rounded-sm outline-4 outline-red-600': isDraggedOver,
+							'z-69 rounded-sm outline-4 outline-green-600': isValidMoveDest
 						})}
 						data-position={position}
 						role="gridcell"

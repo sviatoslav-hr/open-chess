@@ -41,7 +41,8 @@ type MoveError =
 export function calculateMove(
 	board: BoardInfo,
 	from: Position,
-	to: Position
+	to: Position,
+	ignoreAllowed = false
 ): Either<Move, MoveError> {
 	const piece = board.pieces.get(from);
 	if (!piece) {
@@ -56,6 +57,11 @@ export function calculateMove(
 	const targetPiece = board.pieces.get(to);
 	if (targetPiece && pieceColor === PieceId.getColor(targetPiece)) {
 		return [null, { type: 'captureOwnPiece' }];
+	}
+
+	const allowedMoves = board.allowedMoves.get(from)?.map((m) => m.toString());
+	if (!ignoreAllowed && !allowedMoves?.includes(to.toString())) {
+		return [null, { type: 'invalidPieceMove', piece }];
 	}
 
 	let isValid = false;
@@ -297,6 +303,7 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 	}
 	if (move.castling) {
 		applyCastlingMove(newBoard, move);
+		fillAllowedMoves(board);
 		return newBoard;
 	}
 
@@ -328,7 +335,7 @@ export function applyMove(board: BoardInfo, move: Move): BoardInfo {
 		newBoard.enPassantTarget = Position.make(move.from.file, rank);
 	}
 
-	fillAllowedMoves(board);
+	fillAllowedMoves(newBoard);
 	return newBoard;
 }
 
@@ -392,13 +399,74 @@ function updateCastlingRights(castling: CastlingRights, move: Move): void {
 	}
 }
 
+// TODO: This really should be rewritten... I'm not proud of this...
+// PERF: THIS IS AWFUL!
 export function fillAllowedMoves(board: BoardInfo): void {
-	if (board.allowedMoves.size) {
+	if (board.allowedMoves.size > 0) {
 		throw new Error('Allowed moves already calculated');
 	}
 	const allowedMoves = board.allowedMoves;
 
-	// 1. Check if the king is in check and filter moves accordingly
-	// 2. For each piece, calculate all possible moves
-	// 3. Filter out moves that would leave the king in check
+	// Get all pieces of the current player's color
+	for (const [posStr, piece] of board.pieces) {
+		if (PieceId.getColor(piece) !== board.turnColor) continue;
+		const from = Position.fromStr(posStr);
+		const possibleMoves: Position[] = [];
+
+		// Generate all possible destination squares
+		for (const file of BOARD_FILES) {
+			for (const rank of BOARD_RANKS) {
+				const to = Position.make(file, rank);
+				const [move] = calculateMove(board, from, to, /*ignoreAllowed*/ true);
+				if (move) {
+					// Create a temporary board to test if the move leaves the king in check
+					const tempBoard: BoardInfo = {
+						...board,
+						pieces: board.pieces.clone(),
+						allowedMoves: new BoardMap()
+					};
+
+					// Apply the move to the temporary board
+					tempBoard.pieces.delete(from.toString());
+					if (move.isEnPassantCapture) {
+						const capturedPawnRank = from.rank;
+						const capturedPawnPos: PositionStr = `${to.file}${capturedPawnRank}`;
+						tempBoard.pieces.delete(capturedPawnPos);
+					}
+					tempBoard.pieces.set(to, move.promotion ?? piece);
+
+					// Find the king's position after the move
+					const kingPiece =
+						board.turnColor === PlayerColor.WHITE ? PieceId.WHITE_KING : PieceId.BLACK_KING;
+					const kingPos = tempBoard.pieces.findPositionFor(kingPiece);
+					if (!kingPos) continue;
+
+					// Check if any opponent piece can capture the king
+					let isKingInCheck = false;
+					for (const [opPosStr, opPiece] of tempBoard.pieces) {
+						if (PieceId.getColor(opPiece) === board.turnColor) continue;
+						const opFrom = Position.fromStr(opPosStr);
+						const [opMove] = calculateMove(
+							{ ...tempBoard, turnColor: PieceId.getColor(opPiece) },
+							opFrom,
+							Position.fromStr(kingPos),
+							/*ignoreAllowed*/ true
+						);
+						if (opMove) {
+							isKingInCheck = true;
+							break;
+						}
+					}
+
+					if (!isKingInCheck) {
+						possibleMoves.push(to);
+					}
+				}
+			}
+		}
+
+		if (possibleMoves.length > 0) {
+			allowedMoves.set(from, possibleMoves);
+		}
+	}
 }
